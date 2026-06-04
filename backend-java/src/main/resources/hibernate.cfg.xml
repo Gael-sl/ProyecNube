@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+        "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+        "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+<hibernate-configuration>
+    <session-factory>
+        <!-- Configuración de la conexión a la base de datos -->
+        <property name="hibernate.connection.driver_class">org.postgresql.Driver</property>
+        
+        <!-- URL de JDBC multi-host con soporte para recuperación ante fallos (Failover) -->
+        <property name="hibernate.connection.url">jdbc:postgresql://postgres-primary:5432,postgres-standby:5432/car_db?targetServerType=primary</property>
+        <property name="hibernate.connection.username">postgres</property>
+        <property name="hibernate.connection.password">masterpassword</property>
+
+        <!-- Dialecto SQL -->
+        <property name="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</property>
+
+        <!-- Configuración del Pool de Conexiones: HikariCP -->
+        <property name="hibernate.connection.provider_class">org.hibernate.hikaricp.internal.HikariCPConnectionProvider</property>
+        <property name="hibernate.hikari.minimumIdle">1</property>
+        <property name="hibernate.hikari.maximumPoolSize">5</property>
+        <property name="hibernate.hikari.idleTimeout">30000</property>
+        
+        <!-- Tiempo de espera de conexión de 3 segundos para una detección rápida de fallos -->
+        <property name="hibernate.hikari.connectionTimeout">3000</property>
+        <property name="hibernate.hikari.validationTimeout">1500</property>
+
+        <!-- Habilitar la generación/actualización automática del esquema de la base de datos de Hibernate -->
+        <property name="hibernate.hbm2ddl.auto">update</property>
+
+        <!-- Mostrar todas las consultas SQL ejecutadas en la salida estándar -->
+        <property name="hibernate.show_sql">true</property>
+        <property name="hibernate.format_sql">true</property>
+
+        <!-- Clases de mapeo de entidades -->
+        <mapping class="com.garage.model.Car"/>
+        <mapping class="com.garage.model.Telemetry"/>
+    </session-factory>
+</hibernate-configuration>

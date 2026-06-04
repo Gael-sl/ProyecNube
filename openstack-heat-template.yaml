@@ -1,0 +1,253 @@
+heat_template_version: 2018-08-31
+
+description: >
+  Plantilla de Orquestación de OpenStack (Heat) para el despliegue distribuido de la
+  práctica final "Garaje Deportivo". Provisiona la topología de red con Neutron, 
+  volúmenes persistentes en Cinder, e instancias de cómputo en Nova.
+
+parameters:
+  image_ubuntu:
+    type: string
+    label: Imagen base de SO
+    description: Imagen de Glance para las instancias (Ubuntu 22.04 LTS recomendada)
+    default: "Ubuntu-22.04-LTS"
+  flavor_small:
+    type: string
+    label: Sabor de Instancia Ligera
+    description: Sabor para microservicios y brokers (1 vCPU, 1GB RAM)
+    default: "m1.tiny"
+  flavor_medium:
+    type: string
+    label: Sabor de Instancia Servidor/BD
+    description: Sabor para Tomcat y Postgres (2 vCPUs, 2GB RAM)
+    default: "m1.small"
+  key_name:
+    type: string
+    label: Clave SSH Keypair
+    description: Nombre del Keypair en OpenStack para acceso de administrador
+    default: "garaje-key"
+
+resources:
+  # =========================================================================
+  # 1. SEGMENTO DE RED DE NEUTRON (Red Privada de la Nube)
+  # =========================================================================
+  nube_privada_net:
+    type: OS::Neutron::Net
+    properties:
+      name: nube_privada_net
+
+  nube_privada_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: nube_privada_subnet
+      network: { get_resource: nube_privada_net }
+      cidr: 172.20.0.0/24
+      gateway_ip: 172.20.0.1
+      dns_nameservers: [ "8.8.8.8", "8.8.4.4" ]
+
+  # Router Virtual para conectar la red de Neutron al mundo exterior
+  cloud_router:
+    type: OS::Neutron::Router
+    properties:
+      name: cloud_router
+      external_gateway_info:
+        network: public
+
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router: { get_resource: cloud_router }
+      subnet: { get_resource: nube_privada_subnet }
+
+  # =========================================================================
+  # 2. ALMACENAMIENTO PERSISTENTE DE CINDER (Bases de Datos)
+  # =========================================================================
+  postgres_primary_volume:
+    type: OS::Cinder::Volume
+    properties:
+      name: postgres_primary_volume
+      size: 10 # 10 GB
+      description: Disco duro persistente para la BD Postgres Primaria
+
+  postgres_standby_volume:
+    type: OS::Cinder::Volume
+    properties:
+      name: postgres_standby_volume
+      size: 10 # 10 GB
+      description: Disco duro persistente para la BD Postgres Standby (Espejeada)
+
+  # =========================================================================
+  # 3. GRUPOS DE SEGURIDAD (Firewall de Neutron)
+  # =========================================================================
+  sec_group_web:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: sec_group_web
+      description: Reglas para Nginx Edge Router (HTTPS y HTTP)
+      rules:
+        - protocol: tcp
+          port_range_min: 80
+          port_range_max: 80
+          remote_ip_prefix: 0.0.0.0/0
+        - protocol: tcp
+          port_range_min: 443
+          port_range_max: 443
+          remote_ip_prefix: 0.0.0.0/0
+
+  sec_group_internal:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: sec_group_internal
+      description: Reglas de comunicación interna dentro de la subred nube_privada_net
+      rules:
+        - protocol: tcp
+          port_range_min: 1
+          port_range_max: 65535
+          remote_ip_prefix: 172.20.0.0/24
+        - protocol: icmp
+          remote_ip_prefix: 172.20.0.0/24
+
+  # =========================================================================
+  # 4. PUERTOS VIRTUALES CON DIRECCIÓN IP FIJA (Neutron Ports)
+  # =========================================================================
+  nginx_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: nube_privada_net }
+      fixed_ips:
+        - subnet: { get_resource: nube_privada_subnet }
+          ip_address: 172.20.0.10
+      security_groups: [ { get_resource: sec_group_web }, { get_resource: sec_group_internal } ]
+
+  tomcat_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: nube_privada_net }
+      fixed_ips:
+        - subnet: { get_resource: nube_privada_subnet }
+          ip_address: 172.20.0.20
+      security_groups: [ { get_resource: sec_group_internal } ]
+
+  mosquitto_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: nube_privada_net }
+      fixed_ips:
+        - subnet: { get_resource: nube_privada_subnet }
+          ip_address: 172.20.0.30
+      security_groups: [ { get_resource: sec_group_internal } ]
+
+  postgres_primary_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: nube_privada_net }
+      fixed_ips:
+        - subnet: { get_resource: nube_privada_subnet }
+          ip_address: 172.20.0.40
+      security_groups: [ { get_resource: sec_group_internal } ]
+
+  postgres_standby_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: nube_privada_net }
+      fixed_ips:
+        - subnet: { get_resource: nube_privada_subnet }
+          ip_address: 172.20.0.50
+      security_groups: [ { get_resource: sec_group_internal } ]
+
+  telemetry_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: nube_privada_net }
+      fixed_ips:
+        - subnet: { get_resource: nube_privada_subnet }
+          ip_address: 172.20.0.60
+      security_groups: [ { get_resource: sec_group_internal } ]
+
+  # =========================================================================
+  # 5. INSTANCIAS DE MAQUINAS VIRTUALES (Nova Compute)
+  # =========================================================================
+  nginx_vm:
+    type: OS::Nova::Server
+    properties:
+      name: nginx-edge-router
+      image: { get_param: image_ubuntu }
+      flavor: { get_param: flavor_small }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: nginx_port }
+
+  tomcat_vm:
+    type: OS::Nova::Server
+    properties:
+      name: tomcat-app-server
+      image: { get_param: image_ubuntu }
+      flavor: { get_param: flavor_medium }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: tomcat_port }
+
+  mosquitto_vm:
+    type: OS::Nova::Server
+    properties:
+      name: mosquitto-mqtt-broker
+      image: { get_param: image_ubuntu }
+      flavor: { get_param: flavor_small }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: mosquitto_port }
+
+  postgres_primary_vm:
+    type: OS::Nova::Server
+    properties:
+      name: postgres-primary-db
+      image: { get_param: image_ubuntu }
+      flavor: { get_param: flavor_medium }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: postgres_primary_port }
+
+  postgres_standby_vm:
+    type: OS::Nova::Server
+    properties:
+      name: postgres-standby-db
+      image: { get_param: image_ubuntu }
+      flavor: { get_param: flavor_medium }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: postgres_standby_port }
+
+  telemetry_vm:
+    type: OS::Nova::Server
+    properties:
+      name: telemetry-microservice
+      image: { get_param: image_ubuntu }
+      flavor: { get_param: flavor_small }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: telemetry_port }
+
+  # =========================================================================
+  # 6. ASOCIACIÓN DE VOLÚMENES CINDER A INSTANCIAS NOVA
+  # =========================================================================
+  attach_primary_vol:
+    type: OS::Nova::VolumeAttachment
+    properties:
+      server_id: { get_resource: postgres_primary_vm }
+      volume_id: { get_resource: postgres_primary_volume }
+      mountpoint: /dev/vdb
+
+  attach_standby_vol:
+    type: OS::Nova::VolumeAttachment
+    properties:
+      server_id: { get_resource: postgres_standby_vm }
+      volume_id: { get_resource: postgres_standby_volume }
+      mountpoint: /dev/vdb
+
+outputs:
+  edge_ip:
+    description: IP privada del balanceador Nginx (Borde del sistema)
+    value: { get_attr: [ nginx_port, fixed_ips, 0, ip_address ] }
+  primary_db_ip:
+    description: IP estática del nodo primario de Postgres en Neutron
+    value: { get_attr: [ postgres_primary_port, fixed_ips, 0, ip_address ] }

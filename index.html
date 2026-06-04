@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garaje Deportivo - Panel de Control de Telemetría Distribuidos</title>
+    
+    <!-- Fuentes y CDN de Iconos -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js para los gráficos de telemetría en tiempo real -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-card: rgba(20, 26, 45, 0.6);
+            --bg-card-border: rgba(255, 255, 255, 0.08);
+            --accent-cyan: #00f0ff;
+            --accent-orange: #ff5e00;
+            --accent-purple: #bd00ff;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --glow-cyan: 0 0 15px rgba(0, 240, 255, 0.4);
+            --glow-orange: 0 0 15px rgba(255, 94, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+            scrollbar-width: thin;
+            scrollbar-color: var(--bg-card-border) var(--bg-primary);
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(189, 0, 255, 0.05) 0%, transparent 40%);
+            background-attachment: fixed;
+            overflow-x: hidden;
+        }
+
+        /* Contenedor Principal */
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--bg-card-border);
+            margin-bottom: 30px;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            font-size: 2.2rem;
+            background: linear-gradient(45deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.3));
+        }
+
+        .logo-text h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .logo-text span {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            letter-spacing: 3px;
+        }
+
+        /* WIDGET ESTADO NUBE */
+        .cloud-status-widget {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            padding: 10px 20px;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-details {
+            font-size: 0.9rem;
+        }
+
+        .status-details .db-node {
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        /* FORMULARIO DE LOGIN (PANTALLA COMPLETA SI NO ESTA LOGUEADO) */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 14, 23, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            padding: 40px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 240, 255, 0.08) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .login-card h2 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+
+        .login-card p {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-group i {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            color: var(--text-muted);
+        }
+
+        .input-group input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--bg-card-border);
+            padding: 12px 15px 12px 45px;
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(45deg, var(--accent-cyan), var(--accent-purple));
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 240, 255, 0.4);
+        }
+
+        .login-error {
+            color: var(--danger);
+            margin-top: 15px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        /* GRID DEL DASHBOARD */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* CARDS */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            border-radius: 16px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title i {
+            color: var(--accent-cyan);
+        }
+
+        /* TARJETAS DE MÉTRICAS RÁPIDAS */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-3px);
+        }
+
+        .stat-val {
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 5px 0;
+            background: linear-gradient(45deg, #fff, var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-lbl {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* FORMULARIO DE INVENTARIO (CARS) */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--bg-card-border);
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-main);
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        .submit-btn {
+            background: linear-gradient(45deg, var(--accent-cyan), var(--accent-purple));
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            box-shadow: var(--glow-cyan);
+            transform: translateY(-1px);
+        }
+
+        /* TABLAS */
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 380px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background-color: rgba(15, 23, 42, 0.8);
+            padding: 12px 15px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--bg-card-border);
+        }
+
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .pill-ferrari { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .pill-porsche { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .pill-lamborghini { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .pill-chevrolet { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .pill-generic { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+        .telemetry-row {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        /* ANIMS */
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid var(--bg-card-border);
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.85rem;
+        }
+
+        .logout-btn:hover {
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg-card);
+            border-left: 4px solid var(--accent-cyan);
+            border-top: 1px solid var(--bg-card-border);
+            border-right: 1px solid var(--bg-card-border);
+            border-bottom: 1px solid var(--bg-card-border);
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1001;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.4s ease;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- OVERLAY DE LOGIN -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-card">
+            <i class="fa-solid fa-gauge-high logo-icon" style="font-size: 3rem; margin-bottom: 20px;"></i>
+            <h2>Acceso al Sistema</h2>
+            <p>Introduce las credenciales seguras para autenticar el cliente con la API cifrada</p>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="input-group">
+                    <label for="username">Usuario</label>
+                    <i class="fa-solid fa-user"></i>
+                    <input type="text" id="username" value="admin" required placeholder="Ingresa usuario">
+                </div>
+                <div class="input-group">
+                    <label for="password">Contraseña</label>
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" id="password" value="admin123" required placeholder="Ingresa contraseña">
+                </div>
+                <button type="submit" class="login-btn">
+                    <i class="fa-solid fa-key" style="margin-right: 8px;"></i>Iniciar Sesión (JWT)
+                </button>
+                <div class="login-error" id="loginError">Credenciales incorrectas o servidor inaccesible.</div>
+            </form>
+        </div>
+    </div>
+
+    <!-- APP PRINCIPAL -->
+    <div class="app-container">
+        
+        <!-- HEADER -->
+        <header>
+            <div class="logo-section">
+                <i class="fa-solid fa-gauge-high logo-icon"></i>
+                <div class="logo-text">
+                    <h1>Garaje Deportivo</h1>
+                    <span>Sistemas Distribuidos</span>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <!-- Widget Salud Replicación -->
+                <div class="cloud-status-widget">
+                    <div class="status-indicator" id="statusIndicator"></div>
+                    <div class="status-details">
+                        Nube: <span class="db-node" id="activeDbNode">Cargando...</span>
+                    </div>
+                </div>
+
+                <button class="logout-btn" onclick="handleLogout()">
+                    <i class="fa-solid fa-right-from-bracket"></i> Salir
+                </button>
+            </div>
+        </header>
+
+        <!-- FILA DE METRICAS RAPIDAS -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-lbl"><i class="fa-solid fa-car" style="color: var(--accent-cyan);"></i> Inventario</div>
+                <div class="stat-val" id="statCarsCount">0</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Autos en BD (Hibernate)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-lbl"><i class="fa-solid fa-network-wired" style="color: var(--accent-orange);"></i> Telemetría</div>
+                <div class="stat-val" id="statTelemetryCount">0</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Mediciones Descifradas (AES)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-lbl"><i class="fa-solid fa-tachometer-alt" style="color: var(--accent-cyan);"></i> Velocidad Máxima</div>
+                <div class="stat-val" id="statMaxSpeed">0.0 <span style="font-size: 1rem;">km/h</span></div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Registrada en tiempo real</div>
+            </div>
+        </div>
+
+        <!-- SECCION DE CONTENIDO CENTRAL -->
+        <div class="dashboard-grid">
+            
+            <!-- PANEL IZQUIERDO: GRAFICOS Y TABLA DE TELEMETRIA -->
+            <div>
+                <!-- Gráfico de Telemetría -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-chart-line"></i> Gráfico de Rendimiento en Tiempo Real
+                        </div>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Actualización automática (5s)</span>
+                    </div>
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="telemetryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Tabla de Telemetrías -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-database"></i> Últimos Datos de Telemetría Cifrada (AES-128)
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Marca</th>
+                                    <th>Modelo</th>
+                                    <th>Velocidad</th>
+                                    <th>RPM</th>
+                                    <th>Temp. Motor</th>
+                                    <th>Marcha</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody id="telemetryTableBody">
+                                <tr>
+                                    <td colspan="8" style="text-align: center; color: var(--text-muted);">Esperando datos de la API segura...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL DERECHO: INVENTARIO DE AUTOS Y AGREGAR NUEVO -->
+            <div>
+                <!-- Formulario Agregar Auto -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-plus-circle"></i> Registrar Auto Deportivo
+                        </div>
+                    </div>
+                    <form id="carForm" onsubmit="handleAddCar(event)">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="carBrand">Marca</label>
+                                <input type="text" id="carBrand" required placeholder="Ej. Porsche">
+                            </div>
+                            <div class="form-group">
+                                <label for="carModel">Modelo</label>
+                                <input type="text" id="carModel" required placeholder="Ej. 911 GT3">
+                            </div>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="carHp">Caballos (HP)</label>
+                                <input type="number" id="carHp" min="1" required placeholder="Ej. 520">
+                            </div>
+                            <div class="form-group">
+                                <label for="carMaxSpeed">Vel. Máxima (km/h)</label>
+                                <input type="number" step="0.1" id="carMaxSpeed" min="1" required placeholder="Ej. 318.5">
+                            </div>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="carPrice">Precio (USD)</label>
+                                <input type="number" step="0.01" id="carPrice" min="1" required placeholder="Ej. 223000">
+                            </div>
+                            <div class="form-group">
+                                <label for="carYear">Año Modelo</label>
+                                <input type="number" id="carYear" min="1900" max="2100" required placeholder="Ej. 2024">
+                            </div>
+                        </div>
+                        <button type="submit" class="submit-btn">
+                            <i class="fa-solid fa-save" style="margin-right: 8px;"></i>Guardar Auto (Hibernate)
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Lista de Autos Registrados -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-list"></i> Inventario de Autos (Cliente-Servidor)
+                        </div>
+                    </div>
+                    <div class="table-wrapper" style="max-height: 250px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Marca / Modelo</th>
+                                    <th>Caballos</th>
+                                    <th>Precio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="carsTableBody">
+                                <tr>
+                                    <td colspan="3" style="text-align: center; color: var(--text-muted);">Sin autos en el garaje.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- TOAST NOTIFICATIONS -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-info-circle" style="color: var(--accent-cyan);"></i>
+        <span id="toastMsg">Mensaje de notificación</span>
+    </div>
+
+    <!-- LOGICA FRONTEND -->
+    <script>
+        // Variables globales
+        let jwtToken = localStorage.getItem('jwt_token') || null;
+        let chartInstance = null;
+        const apiHost = window.location.origin; // Toma dinámicamente la IP de la VM
+
+        // Verificar token al arrancar
+        window.onload = function() {
+            if (jwtToken) {
+                document.getElementById('loginOverlay').style.display = 'none';
+                initDashboard();
+            } else {
+                document.getElementById('loginOverlay').style.opacity = '1';
+            }
+            startHealthCheck();
+        };
+
+        // Mostrar Notificación Toast
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const icon = toast.querySelector('i');
+            
+            toastMsg.innerText = msg;
+            if (isError) {
+                toast.style.borderColor = 'var(--danger)';
+                icon.className = 'fa-solid fa-circle-exclamation';
+                icon.style.color = 'var(--danger)';
+            } else {
+                toast.style.borderColor = 'var(--accent-cyan)';
+                icon.className = 'fa-solid fa-circle-check';
+                icon.style.color = 'var(--accent-cyan)';
+            }
+            
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Manejo del Login con JWT
+        async function handleLogin(e) {
+            e.preventDefault();
+            const usernameInput = document.getElementById('username').value;
+            const passwordInput = document.getElementById('password').value;
+            const errorDiv = document.getElementById('loginError');
+
+            try {
+                const response = await fetch(`${apiHost}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: usernameInput, password: passwordInput })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    jwtToken = data.token;
+                    localStorage.setItem('jwt_token', jwtToken);
+                    
+                    // Transición para cerrar login
+                    document.getElementById('loginOverlay').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('loginOverlay').style.display = 'none';
+                        initDashboard();
+                    }, 500);
+                    
+                    showToast("Autenticado con éxito. Token JWT almacenado.");
+                } else {
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerText = "Acceso denegado. Código de estado: " + response.status;
+                }
+            } catch (err) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerText = "Error de red al conectar al servidor.";
+                console.error(err);
+            }
+        }
+
+        // Cerrar sesión
+        function handleLogout() {
+            localStorage.removeItem('jwt_token');
+            jwtToken = null;
+            document.getElementById('loginOverlay').style.display = 'flex';
+            setTimeout(() => {
+                document.getElementById('loginOverlay').style.opacity = '1';
+            }, 50);
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+        }
+
+        // Inicializar datos del Dashboard
+        function initDashboard() {
+            fetchStats();
+            fetchCars();
+            initChart();
+            fetchTelemetry();
+
+            // Intervalo de recarga cada 5 segundos (Tiempo real distribuido)
+            setInterval(() => {
+                if (jwtToken) {
+                    fetchStats();
+                    fetchTelemetry();
+                    fetchCars();
+                }
+            }, 5000);
+        }
+
+        // Obtener estado del servidor y Postgres de forma pública
+        async function startHealthCheck() {
+            const check = async () => {
+                try {
+                    const response = await fetch(`${apiHost}/api/health`);
+                    const data = await response.json();
+                    
+                    const indicator = document.getElementById('statusIndicator');
+                    const nodeLabel = document.getElementById('activeDbNode');
+                    
+                    if (data.status === 'UP') {
+                        indicator.style.backgroundColor = 'var(--success)';
+                        indicator.style.boxShadow = '0 0 10px var(--success)';
+                        
+                        // Extraer IP de BD activa limpia
+                        let dbIp = data.database_active_node_ip || "Desconocido";
+                        if (dbIp.includes('/')) {
+                            dbIp = dbIp.split('/')[0];
+                        }
+                        
+                        nodeLabel.innerHTML = `ONLINE (BD Activa: <b>${dbIp}</b>)`;
+                    } else {
+                        indicator.style.backgroundColor = 'var(--danger)';
+                        indicator.style.boxShadow = '0 0 10px var(--danger)';
+                        nodeLabel.innerHTML = "BD FUERA DE LÍNEA";
+                    }
+                } catch (err) {
+                    const indicator = document.getElementById('statusIndicator');
+                    const nodeLabel = document.getElementById('activeDbNode');
+                    indicator.style.backgroundColor = 'var(--danger)';
+                    indicator.style.boxShadow = '0 0 10px var(--danger)';
+                    nodeLabel.innerHTML = "API INALCANZABLE";
+                }
+            };
+            
+            check();
+            setInterval(check, 4000); // Polling rápido de estado de red
+        }
+
+        // Obtener estadísticas rápidas
+        async function fetchStats() {
+            try {
+                // Cantidad de carros
+                const carsRes = await fetch(`${apiHost}/api/cars`, {
+                    headers: { 'Authorization': `Bearer ${jwtToken}` }
+                });
+                if (carsRes.ok) {
+                    const cars = await carsRes.json();
+                    document.getElementById('statCarsCount').innerText = cars.length;
+                }
+
+                // Cantidad de telemetrías y velocidad máxima
+                const telemetryRes = await fetch(`${apiHost}/api/telemetry`, {
+                    headers: { 'Authorization': `Bearer ${jwtToken}` }
+                });
+                if (telemetryRes.ok) {
+                    const telemetry = await telemetryRes.json();
+                    document.getElementById('statTelemetryCount').innerText = telemetry.length;
+                    
+                    if (telemetry.length > 0) {
+                        const speeds = telemetry.map(t => t.speed);
+                        const maxSpeed = Math.max(...speeds);
+                        document.getElementById('statMaxSpeed').innerHTML = `${maxSpeed.toFixed(1)} <span style="font-size: 1rem;">km/h</span>`;
+                    }
+                }
+            } catch (err) {
+                console.error("Error al obtener estadísticas:", err);
+            }
+        }
+
+        // Obtener lista de coches de base de datos
+        async function fetchCars() {
+            try {
+                const response = await fetch(`${apiHost}/api/cars`, {
+                    headers: { 'Authorization': `Bearer ${jwtToken}` }
+                });
+
+                if (response.ok) {
+                    const cars = await response.json();
+                    const tbody = document.getElementById('carsTableBody');
+                    
+                    if (cars.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Sin autos en el garaje.</td></tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = cars.map(car => `
+                        <tr>
+                            <td>
+                                <b>${car.brand}</b><br>
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">${car.model} (${car.year})</span>
+                            </td>
+                            <td>${car.horsepower} HP</td>
+                            <td style="color: var(--accent-cyan); font-weight: 600;">$${car.price.toLocaleString()}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error("Error al obtener carros:", err);
+            }
+        }
+
+        // Registrar nuevo auto
+        async function handleAddCar(e) {
+            e.preventDefault();
+            
+            const carData = {
+                brand: document.getElementById('carBrand').value,
+                model: document.getElementById('carModel').value,
+                horsepower: parseInt(document.getElementById('carHp').value),
+                maxSpeed: parseFloat(document.getElementById('carMaxSpeed').value),
+                price: parseFloat(document.getElementById('carPrice').value),
+                year: parseInt(document.getElementById('carYear').value)
+            };
+
+            try {
+                const response = await fetch(`${apiHost}/api/cars`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
+                    body: JSON.stringify(carData)
+                });
+
+                if (response.ok) {
+                    showToast("¡Auto registrado con éxito en PostgreSQL!");
+                    document.getElementById('carForm').reset();
+                    fetchCars();
+                    fetchStats();
+                } else {
+                    showToast("Error al guardar auto. Código: " + response.status, true);
+                }
+            } catch (err) {
+                showToast("Error de conexión al guardar auto.", true);
+                console.error(err);
+            }
+        }
+
+        // Obtener datos de telemetría descifrados
+        async function fetchTelemetry() {
+            try {
+                const response = await fetch(`${apiHost}/api/telemetry`, {
+                    headers: { 'Authorization': `Bearer ${jwtToken}` }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Ordenar por ID descendente para mostrar los más recientes arriba
+                    const sortedData = data.sort((a,b) => b.id - a.id);
+                    
+                    // Actualizar tabla
+                    const tbody = document.getElementById('telemetryTableBody');
+                    if (sortedData.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Esperando datos de telemetría de los carros...</td></tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = sortedData.slice(0, 15).map(t => {
+                        let pillClass = "pill-generic";
+                        const brandUpper = t.brand.toUpperCase();
+                        if (brandUpper.includes("FERRARI")) pillClass = "pill-ferrari";
+                        else if (brandUpper.includes("PORSCHE")) pillClass = "pill-porsche";
+                        else if (brandUpper.includes("LAMBORGHINI")) pillClass = "pill-lamborghini";
+                        else if (brandUpper.includes("CHEVROLET")) pillClass = "pill-chevrolet";
+
+                        // Formatear timestamp local simple
+                        const date = new Date(t.timestamp * 1000);
+                        const timeStr = date.toLocaleTimeString();
+
+                        // Manejar la serialización de Jackson que devuelve snake_case
+                        const engineTemp = t.engine_temp !== undefined ? t.engine_temp : t.engineTemp;
+                        const speed = t.speed;
+                        const gear = t.gear;
+
+                        return `
+                            <tr class="telemetry-row">
+                                <td><code>#${t.id}</code></td>
+                                <td><span class="pill ${pillClass}">${t.brand}</span></td>
+                                <td><b>${t.model}</b></td>
+                                <td style="color: var(--accent-cyan); font-weight: 600;">${speed.toFixed(1)} km/h</td>
+                                <td>${t.rpm} RPM</td>
+                                <td style="color: ${engineTemp > 102 ? 'var(--danger)' : 'var(--text-main)'};">${engineTemp.toFixed(1)} °C</td>
+                                <td><b>${gear}ª</b></td>
+                                <td>${timeStr}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    // Actualizar gráfico en tiempo real con las últimas 10 mediciones en orden cronológico
+                    if (chartInstance && data.length > 0) {
+                        const chartData = data.sort((a,b) => a.id - b.id).slice(-10);
+                        chartInstance.data.labels = chartData.map(t => new Date(t.timestamp * 1000).toLocaleTimeString());
+                        chartInstance.data.datasets[0].data = chartData.map(t => t.speed);
+                        chartInstance.data.datasets[1].data = chartData.map(t => t.engine_temp !== undefined ? t.engine_temp : t.engineTemp);
+                        chartInstance.update('none'); // Update sin animaciones bruscas
+                    }
+                }
+            } catch (err) {
+                console.error("Error al obtener telemetrías:", err);
+            }
+        }
+
+        // Inicializar gráfico de Chart.js
+        function initChart() {
+            const ctx = document.getElementById('telemetryChart').getContext('2d');
+            
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Velocidad (km/h)',
+                            borderColor: '#00f0ff',
+                            borderWidth: 3,
+                            pointBackgroundColor: '#00f0ff',
+                            pointRadius: 4,
+                            backgroundColor: 'rgba(0, 240, 255, 0.1)',
+                            fill: true,
+                            data: [],
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Temp. Motor (°C)',
+                            borderColor: '#ff5e00',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#ff5e00',
+                            pointRadius: 3,
+                            backgroundColor: 'rgba(255, 94, 0, 0.05)',
+                            fill: true,
+                            data: [],
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#f8fafc', font: { family: 'Outfit' } }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

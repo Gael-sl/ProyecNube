@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # MQTT Broker (Middleware / Preconfigured Service Container in Cloud)
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      nube_privada_net:
+        ipv4_address: 172.50.0.30
+
+  # PostgreSQL Active/Write Node (Cloud Database Primary)
+  postgres-primary:
+    image: postgres:16-alpine
+    container_name: postgres-primary
+    environment:
+      POSTGRES_DB: car_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: masterpassword
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./postgres-primary-init:/docker-entrypoint-initdb.d
+      - postgres_primary_data:/var/lib/postgresql/data
+    ports:
+      - "5473:5432" # Exposed on port 5473 on host to avoid conflicts
+    command: postgres -c wal_level=replica -c max_wal_senders=10 -c max_replication_slots=10 -c hot_standby=on
+    networks:
+      nube_privada_net:
+        ipv4_address: 172.50.0.40
+
+  # PostgreSQL Passive/Read Node with Auto-Failover Monitor (Cloud Database Standby)
+  postgres-standby:
+    build:
+      context: ./postgres-standby
+    container_name: postgres-standby
+    user: postgres
+    environment:
+      POSTGRES_DB: car_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: masterpassword
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_standby_data:/var/lib/postgresql/data
+    ports:
+      - "5474:5432" # Exposed on port 5474 on host to avoid conflicts
+    depends_on:
+      - postgres-primary
+    networks:
+      nube_privada_net:
+        ipv4_address: 172.50.0.50
+
+  # Java Servlet API Backend (Multi-tier Application Server running Tomcat 10)
+  tomcat:
+    build:
+      context: ./backend-java
+    container_name: tomcat
+    depends_on:
+      - postgres-primary
+      - postgres-standby
+      - mosquitto
+    networks:
+      nube_privada_net:
+        ipv4_address: 172.50.0.20
+
+  # Nginx Reverse Proxy with TLS/SSL Certificate termination (Edge Web Router)
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: nginx
+    ports:
+      - "8085:80"
+      - "4443:443"
+    depends_on:
+      - tomcat
+    networks:
+      nube_privada_net:
+        ipv4_address: 172.50.0.10
+
+  # Sports Car Telemetry simulator microservice (Python Microservice)
+  microservice-telemetry:
+    build:
+      context: ./microservice-telemetry
+    container_name: microservice-telemetry
+    depends_on:
+      - mosquitto
+    networks:
+      nube_privada_net:
+        ipv4_address: 172.50.0.60
+
+networks:
+  nube_privada_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.50.0.0/24
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  postgres_primary_data:
+  postgres_standby_data:
