@@ -139,8 +139,10 @@
         }
 
         .login-card {
-            background: var(--bg-card);
-            border: 1px solid var(--bg-card-border);
+            background: rgba(20, 26, 45, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             padding: 40px;
             border-radius: 20px;
             width: 100%;
@@ -254,11 +256,13 @@
 
         /* CARDS */
         .card {
-            background: var(--bg-card);
-            border: 1px solid var(--bg-card-border);
+            background: rgba(20, 26, 45, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 16px;
             padding: 25px;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
             position: relative;
             margin-bottom: 25px;
         }
@@ -291,11 +295,14 @@
         }
 
         .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--bg-card-border);
+            background: rgba(20, 26, 45, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
             padding: 20px;
             text-align: center;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
             transition: all 0.3s ease;
         }
 
@@ -479,6 +486,37 @@
         .toast.show {
             transform: translateY(0);
             opacity: 1;
+        }
+
+        /* Estilos adicionales para telemetría */
+        .gear-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 50%;
+            color: var(--accent-cyan);
+            font-weight: bold;
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+        }
+
+        .rpm-bar-container {
+            width: 100%;
+            max-width: 90px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .rpm-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
         }
     </style>
 </head>
@@ -974,15 +1012,25 @@
                         const speed = t.speed;
                         const gear = t.gear;
 
+                        const rpmPct = Math.min((t.rpm / 9000) * 100, 100);
+                        let rpmColor = "var(--accent-cyan)";
+                        if (t.rpm > 7500) rpmColor = "var(--danger)";
+                        else if (t.rpm > 5500) rpmColor = "var(--accent-orange)";
+
                         return `
                             <tr class="telemetry-row">
                                 <td><code>#${t.id}</code></td>
                                 <td><span class="pill ${pillClass}">${t.brand}</span></td>
                                 <td><b>${t.model}</b></td>
                                 <td style="color: var(--accent-cyan); font-weight: 600;">${speed.toFixed(1)} km/h</td>
-                                <td>${t.rpm} RPM</td>
+                                <td>
+                                    <div style="font-weight: 600;">${t.rpm} <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">RPM</span></div>
+                                    <div class="rpm-bar-container">
+                                        <div class="rpm-bar" style="width: ${rpmPct}%; background: ${rpmColor};"></div>
+                                    </div>
+                                </td>
                                 <td style="color: ${engineTemp > 102 ? 'var(--danger)' : 'var(--text-main)'};">${engineTemp.toFixed(1)} °C</td>
-                                <td><b>${gear}ª</b></td>
+                                <td><span class="gear-badge">${gear}ª</span></td>
                                 <td>${timeStr}</td>
                             </tr>
                         `;
