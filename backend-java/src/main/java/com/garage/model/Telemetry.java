@@ -38,7 +38,7 @@ public class Telemetry {
     @Column(name = "reading_timestamp", nullable = false)
     private Long timestamp;
 
-    // Constructors
+    // Constructor 
     public Telemetry() {}
 
     public Telemetry(String brand, String model, Double speed, Integer rpm, Double engineTemp, Integer gear, Long timestamp) {

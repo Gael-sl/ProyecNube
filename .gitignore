@@ -15,3 +15,11 @@ backend-java/target/
 *.log
 .DS_Store
 Thumbs.db
+
+# Env config files
+.env
+
+# Comprised files
+*.zip
+
+

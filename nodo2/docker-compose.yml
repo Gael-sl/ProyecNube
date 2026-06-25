@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # Base de datos standby (Nodo Secundario de Base de Datos)
+  postgres-standby:
+    build:
+      context: ./postgres-standby
+    container_name: postgres-standby-amigo
+    user: postgres
+    environment:
+      POSTGRES_DB: car_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: masterpassword
+      PGDATA: /var/lib/postgresql/data/pgdata
+      PRIMARY_HOST: ${NUBE_IP}
+      PRIMARY_PORT: 5473 # El puerto expuesto del primario en la Laptop 1
+    volumes:
+      - postgres_standby_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # Expone el puerto estándar de Postgres para que Tomcat se conecte
+    restart: always
+
+  # Microservicio de telemetría (IoT Edge Node)
+  microservice-telemetry:
+    build:
+      context: ./microservice-telemetry
+    container_name: telemetry-amigo
+    environment:
+      MQTT_HOST: ${NUBE_IP}
+    restart: always
+
+volumes:
+  postgres_standby_data:
